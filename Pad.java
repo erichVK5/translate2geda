@@ -443,7 +443,7 @@ public class Pad extends FootprintElementArchetype
       } else if (token.startsWith("rot=")) {
         token = token.substring(4);
         kicadShapeOrientation
-            = (long)(10*Integer.parseInt(token.replaceAll("[\"R>/]","")));
+            = (long)(10*Float.parseFloat(token.replaceAll("[\"R>/]","")));
       } else if (token.startsWith("layer=")) {
         token = token.substring(6);
         if (token.replaceAll("[\"R>/]","").equals("16")) {
