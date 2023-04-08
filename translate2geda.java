@@ -1659,7 +1659,7 @@ public class translate2geda {
   private static void defaultFileIOError(Exception e) {
         System.out.println("Hmm, that didn't work. "
                            + "Probably a file IO issue:");
-        System.out.println(e);
+        e.printStackTrace();
   }
 
   // the following method is used to avoid problems
