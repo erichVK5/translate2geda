@@ -80,6 +80,7 @@ public class EagleDeviceSet {
           }
         }
       }
+      newSet.close();
     }
   }
 

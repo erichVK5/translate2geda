@@ -259,7 +259,7 @@ public class Footprint
     // we also create a single string version of the module for
     // use by the toString() method
     reconstructedKicadModuleAsString = args;
-
+    moduleDefinition.close();
   }
 
   public String generateGEDAfootprintFilename()

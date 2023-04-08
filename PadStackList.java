@@ -57,6 +57,7 @@ public class PadStackList {
         currentPadStack = currentPadStack + "\n" + currentLine;
       }
     }
+    multiPadStackDefinition.close();
   }
   
   public void addPadStack(String definition) { // single stack def
