@@ -27,51 +27,28 @@
 //    
 //    BXLDecoder Copyright (C) 2016 Erich S. Heinzle a1039181@gmail.com
 
-
-import java.io.*;
-import java.util.Scanner;
 import java.lang.StringBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class SourceBuffer {
-
-  private char[] source_buffer = null;
+  private MappedByteBuffer source_buffer = null;
+  private int length = 0;
   private int source_index = 4;
   private int source_char = 0;
   private int bit = 0;
 
-  public SourceBuffer(String filename) {
-    FileInputStream input = null;
-    char [] ret_buffer = null; 
-    try {
-      input = new FileInputStream(filename);
-      int c;
-      char [] buffer = new char[1000];
-      int bufferIndex = 0;
-      // System.out.println("about to read bytes from file");
-      while ((c = input.read()) != -1) {
-        if (bufferIndex == buffer.length) {
-          char [] newBuffer = new char[buffer.length*2];
-          for (int index = 0; index < buffer.length; index++) {
-            newBuffer[index] = buffer[index];
-          }
-          buffer = newBuffer;
-        }
-        buffer[bufferIndex] = (char)c;
-        bufferIndex++;
-      }
-      ret_buffer = new char[bufferIndex];
-      for (int index = 0; index < bufferIndex; index++) {
-        ret_buffer[index] = buffer[index];
-      }
-      //System.out.println("finished reading bytes from file");
-      //      is_filled = true; // hack, should check
-      input.close();
+  public SourceBuffer(String BXLFile) {
+    Path filename = Paths.get(BXLFile);
+    try (FileChannel channel = FileChannel.open(filename)) {
+	  length = (int) channel.size();
+      source_buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, length);
     } catch (Exception e) {
-      System.out.println ("Exception: " + e);
+	  System.out.println("Exception: " + e);
     }
-    source_buffer = ret_buffer;
   }
-
 
   public int read_next_bit() {
     int result = 0;
@@ -79,8 +56,8 @@ public class SourceBuffer {
       // Fetch next byte from source_buffer
       bit = 7;
       // System.out.println("About to get byte number " +
-      //                   source_index + " from source buffer");
-      source_char = (int)source_buffer[source_index];
+	  // source_index + " from source buffer");
+      source_char = source_buffer.get(source_index);
       result = source_char & (1 << bit);
       source_index++;
     } else {
@@ -91,61 +68,61 @@ public class SourceBuffer {
     // System.out.println("source_index now: " + source_index);
     return result;
   }
-
+	
   public int uncompressed_size() {
-    /* Uncompressed size =
-       B0b7 * 1<<0 + B0b6 * 1<<1 + ... + B0b0 * 1<<7 +
-       B1b7 * 1<<0 + B1b6 * 1<<1 + ... + B2b0 * 1<<7 +
-       B2b7 * 1<<0 + B2b6 * 1<<1 + ... + B3b0 * 1<<7 +
-       B3b7 * 1<<0 + B3b6 * 1<<1 + ... + B4b0 * 1<<7
-    */
-    int size = 0;
-    int mask = 0;
-    for (int i = 7 ; i >=0 ; i--) {
-      if ((source_buffer[0] & (1 << i)) != 0) {
-        size |= (1 << mask);
-      }
-      mask++;
-    }
-    for (int i = 7 ; i >=0 ; i--) {
-      if ((source_buffer[1] & (1 << i)) != 0) {
-        size |= (1<<mask);
-      }
-      mask++;
-    }
-    for (int i = 7 ; i >=0 ; i--) {
-      if ((source_buffer[2] & (1 << i)) != 0) {
-        size |= (1<<mask);
-      }
-      mask++;
-    }
-    for (int i = 7 ; i >=0 ; i--) {
-      if ((source_buffer[3] & (1 << i)) != 0) {
-        size |= (1<<mask);
-      }
-      mask++;
-    }
-    return size;
+  /* Uncompressed size = 
+     B0b7 * 1<<0 + B0b6 * 1<<1 + ... + B0b0 * 1<<7 + 
+     B1b7 * 1<<0 + B1b6 * 1<<1 + ... + B2b0 * 1<<7 + 
+     B2b7 * 1<<0 + B2b6 * 1<<1 + ... + B3b0 * 1<<7 + 
+     B3b7 * 1<<0 + B3b6 * 1<<1 + ... + B4b0 * 1<<7
+   */
+   int size = 0;
+   int mask = 0;
+   for (int i = 7; i >= 0; i--) {
+     if ((source_buffer.get(0) & (1 << i)) != 0) {
+       size |= (1 << mask);
+     }
+     mask++;
+   }
+   for (int i = 7; i >= 0; i--) {
+     if ((source_buffer.get(1) & (1 << i)) != 0) {
+       size |= (1 << mask);
+     }
+	mask++;
   }
+  for (int i = 7; i >= 0; i--) {
+    if ((source_buffer.get(2) & (1 << i)) != 0) {
+	  size |= (1 << mask);
+	}
+    mask++;
+  }
+  for (int i = 7; i >= 0; i--) {
+    if ((source_buffer.get(3) & (1 << i)) != 0) {
+	  size |= (1 << mask);
+    }
+    mask++;
+   }
+   return size;
+}
 
   public String decode() {
 
     NodeTree tree = new NodeTree();
 
     int out_file_length = uncompressed_size();
-    //String sb = "";
-    // immutable Strings replaced with more efficient string handling, suggested by wlbaker: 
+    // String sb = "";
+    // immutable Strings replaced with more efficient string handling, suggested by wlbaker:
     StringBuffer sb = new StringBuffer(out_file_length);
     // System.out.println("About to enter decoding while loop...");
-    while (source_index < source_buffer.length && sb.length() != out_file_length) {
-      //System.out.println("Have entered decoding while loop...");
+    while (source_index < length && sb.length() != out_file_length) {
+      // System.out.println("Have entered decoding while loop...");
       Node node = tree.getRoot();
-      //      System.out.println("About to enter leaf finding while loop...");
+      // System.out.println("About to enter leaf finding while loop...");
       while (!node.is_leaf()) {
         // find leaf node
         // System.out.println("now searching for leaf node...");
         if (read_next_bit() != 0) {
-          //        if (read_next_bit(source_index, source_char, bit, source_buffer) != 0) {
+          // if (read_next_bit(source_index, source_char, bit, source_buffer) != 0) {
           node = node.left;
           // System.out.println("Picking left node, source bit != 0.");
         } else {
@@ -155,20 +132,19 @@ public class SourceBuffer {
       }
       // System.out.println("Node symbol: " + (char)(node.symbol));
       // System.out.println("Node symbol as toString: " + node);
-
-      sb.append((char)node.symbol); // more efficient string building, thanks wlbaker
-      //sb = sb + (char)(node.symbol);
-
-      //      sb = sb + node;
-      //      sb = sb + ((char)(node.symbol & 0xff));
-      //      node.weight += 1;
+      sb.append((char) node.symbol); // more efficient string building, thanks wlbaker
+      // sb = sb + (char)(node.symbol);
+      
+      // sb = sb + node;
+      // sb = sb + ((char)(node.symbol & 0xff));
+      // node.weight += 1;
       node.incrementWeight();
       // System.out.println("decoded text so far is: " +
-      //                   sb + ", now to update tree...");
+      // sb + ", now to update tree...");
       tree.update_tree(node);
     }
-    //source_buffer = null; // not needed for standalone utility
-    //is_filled = false;
+    // source_buffer = null; // not needed for standalone utility
+    // is_filled = false;
     return sb.toString();
   }
 
